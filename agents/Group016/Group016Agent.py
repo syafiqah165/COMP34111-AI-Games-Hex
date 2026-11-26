@@ -1,5 +1,6 @@
 from random import choice
 
+from agents.Group016.board import HexBoard, colour_to_player, opponent
 from src.AgentBase import AgentBase
 from src.Board import Board
 from src.Colour import Colour
@@ -7,43 +8,34 @@ from src.Move import Move
 
 
 class Group016Agent(AgentBase):
-    """This class describes the default Hex agent. It will randomly send a
-    valid move at each turn, and it will choose to swap with a 50% chance.
+    """Week 1 baseline for Group016.
 
-    The class inherits from AgentBase, which is an abstract class.
-    The AgentBase contains the colour property which you can use to get the agent's colour.
-    You must implement the make_move method to make the agent functional.
-    You CANNOT modify the AgentBase class, otherwise your agent might not function.
+    Each turn:
+    1. On turn 2 (only possible as player 2), swap with a 50% chance.
+    2. If a move wins immediately, play it.
+    3. If the opponent could win with their next move, block that cell.
+    4. Otherwise, play a random empty cell.
+
+    The board logic (legal moves, win detection) lives in board.py so that the
+    decision step can be replaced by the team's chosen algorithm later.
     """
 
     def __init__(self, colour: Colour):
         super().__init__(colour)
 
     def make_move(self, turn: int, board: Board, opp_move: Move | None) -> Move:
-        """The game engine will call this method to request a move from the agent.
-        If the agent is to make the first move, opp_move will be None.
-        If the opponent has made a move, opp_move will contain the opponent's move.
-        If the opponent has made a swap move, opp_move will contain a Move object with x=-1 and y=-1,
-        the game engine will also change your colour to the opponent colour.
-
-        Args:
-            turn (int): The current turn
-            board (Board): The current board state
-            opp_move (Move | None): The opponent's last move
-
-        Returns:
-            Move: The agent's move
-        """
-
         if turn == 2 and choice([0, 1]) == 1:
             return Move(-1, -1)
 
-        # choose only from empty tiles, so the move is always legal
-        empty = [
-            (tile.x, tile.y)
-            for row in board.tiles
-            for tile in row
-            if tile.colour is None
-        ]
-        x, y = choice(empty)
-        return Move(x, y)
+        hb = HexBoard.from_engine(board)
+        # read the colour every turn: a swap changes it
+        me = colour_to_player(self.colour)
+        opp = opponent(me)
+        moves = hb.legal_moves()
+
+        for player in (me, opp):
+            for cell in moves:
+                if hb.is_winning_move(cell, player):
+                    return Move(*hb.to_xy(cell))
+
+        return Move(*hb.to_xy(choice(moves)))
